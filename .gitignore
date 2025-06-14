@@ -1,0 +1,26 @@
+# Dependencies
+node_modules
+
+# Production
+dist
+
+# Misc
+.DS_Store
+*.log
+
+# Raycast
+.raycast
+
+# TypeScript
+*.tsbuildinfo
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
