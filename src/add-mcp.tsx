@@ -1,4 +1,12 @@
-import { Form, ActionPanel, Action, showToast, Toast, popToRoot, LocalStorage } from "@raycast/api";
+import {
+  Form,
+  ActionPanel,
+  Action,
+  showToast,
+  Toast,
+  popToRoot,
+  LocalStorage,
+} from "@raycast/api";
 import React, { useState, useEffect } from "react";
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -19,8 +27,29 @@ interface MCPConfig {
   mcps: MCP[];
 }
 
-const CONFIG_FILE = path.join(os.homedir(), ".config", "claude", "mcp_config.json");
-const MCP_MANAGER_PATH = path.join(os.homedir(), ".local", "bin", "mcp-manager");
+interface MCPJsonConfig {
+  name: string;
+  protocol_version: string;
+  endpoint: string;
+  authentication?: {
+    method: string;
+    key?: string;
+    [key: string]: any;
+  };
+}
+
+const CONFIG_FILE = path.join(
+  os.homedir(),
+  ".config",
+  "claude",
+  "mcp_config.json",
+);
+const MCP_MANAGER_PATH = path.join(
+  os.homedir(),
+  ".local",
+  "bin",
+  "mcp-manager",
+);
 
 export default function Command() {
   const [mcpCommand, setMcpCommand] = useState("");
@@ -44,8 +73,50 @@ export default function Command() {
   }
 
   async function parseMcpCommand(command: string): Promise<MCP | null> {
+    const trimmedCommand = command.trim();
+
+    // Check if it's JSON format
+    if (trimmedCommand.startsWith("{")) {
+      try {
+        const jsonConfig: MCPJsonConfig = JSON.parse(trimmedCommand);
+
+        // Validate required fields
+        if (!jsonConfig.name || !jsonConfig.endpoint) {
+          throw new Error("JSON config must have 'name' and 'endpoint' fields");
+        }
+
+        // Convert JSON config to MCP format
+        // For now, we'll create an env-based MCP that uses the endpoint
+        let envVars = "";
+        let authOptions = "";
+
+        if (jsonConfig.authentication) {
+          if (
+            jsonConfig.authentication.method === "api_key" &&
+            jsonConfig.authentication.key
+          ) {
+            envVars = `API_KEY=${jsonConfig.authentication.key}`;
+          }
+          // Handle other authentication methods as needed
+        }
+
+        return {
+          name: jsonConfig.name,
+          type: "env" as const,
+          path: envVars || "NO_AUTH=true",
+          options: `--endpoint ${jsonConfig.endpoint}`,
+        };
+      } catch (e) {
+        if (e instanceof SyntaxError) {
+          throw new Error("Invalid JSON format");
+        }
+        throw e;
+      }
+    }
+
+    // Original command parsing logic
     // Remove 'claude mcp add' prefix if present
-    let cmd = command.trim().replace(/^claude mcp add\s+/, "");
+    let cmd = trimmedCommand.replace(/^claude mcp add\s+/, "");
 
     // Extract name (first part before --)
     const parts = cmd.split(/\s+--\s+/);
@@ -63,10 +134,10 @@ export default function Command() {
     if (rest.startsWith("npx")) {
       type = "npx";
       const npxParts = rest.replace(/^npx\s+/, "");
-      
+
       // Handle -y flag
       const cleanedParts = npxParts.replace(/^-y\s+/, "");
-      
+
       // Extract path and options
       const match = cleanedParts.match(/^@?([^\s]+)(\s+(.*))?$/);
       if (match) {
@@ -76,7 +147,7 @@ export default function Command() {
     } else if (rest.startsWith("env")) {
       type = "env";
       const envParts = rest.replace(/^env\s+/, "");
-      
+
       // Extract environment variable and options
       const match = envParts.match(/^([^=]+=\S+)(\s+(.*))?$/);
       if (match) {
@@ -103,7 +174,7 @@ export default function Command() {
       // Create config directory if it doesn't exist
       const configDir = path.dirname(CONFIG_FILE);
       await fs.mkdir(configDir, { recursive: true });
-      
+
       // Return empty config
       return { mcps: [] };
     }
@@ -117,7 +188,7 @@ export default function Command() {
 
   async function mcpExists(name: string): Promise<boolean> {
     const config = await loadConfig();
-    return config.mcps.some(mcp => mcp.name === name);
+    return config.mcps.some((mcp) => mcp.name === name);
   }
 
   async function handleSubmit() {
@@ -166,7 +237,7 @@ export default function Command() {
 
       // Clear the form
       setMcpCommand("");
-      
+
       // Ask if user wants to run add-all
       showToast({
         style: Toast.Style.Success,
@@ -186,13 +257,13 @@ export default function Command() {
               showToast({
                 style: Toast.Style.Failure,
                 title: "Failed to run add-all",
-                message: error instanceof Error ? error.message : "Unknown error",
+                message:
+                  error instanceof Error ? error.message : "Unknown error",
               });
             }
           },
         },
       });
-
     } catch (error) {
       showToast({
         style: Toast.Style.Failure,
@@ -235,17 +306,21 @@ export default function Command() {
     >
       <Form.TextArea
         id="mcpCommand"
-        title="MCP Command"
-        placeholder="Paste MCP command here (e.g., claude mcp add supabase -- npx -y @supabase/mcp-server-supabase@latest)"
+        title="MCP Command or JSON"
+        placeholder="Paste MCP command or JSON configuration here"
         value={mcpCommand}
         onChange={setMcpCommand}
-        info="Paste a complete MCP command from any website. The extension will parse it and add it to your MCP configuration if it doesn't already exist."
+        info="Paste a complete MCP command or JSON configuration. The extension will parse it and add it to your MCP configuration if it doesn't already exist."
       />
-      
-      <Form.Description text="Examples:" />
+
+      <Form.Description text="Supported formats:" />
+      <Form.Description text="Command format examples:" />
       <Form.Description text="• claude mcp add puppeteer -- npx -y @modelcontextprotocol/server-puppeteer" />
       <Form.Description text="• claude mcp add github -- npx -y @github/mcp-server@latest" />
       <Form.Description text="• claude mcp add digitalocean -- env DIGITALOCEAN_API_TOKEN=your-token npx -y @digitalocean/mcp" />
+      <Form.Description text="" />
+      <Form.Description text="JSON format example:" />
+      <Form.Description text='• {"name": "API Connect", "protocol_version": "MCP v1.0", "endpoint": "https://api.mcpcatalog.io/mcps/1", "authentication": {"method": "api_key", "key": "YOUR_KEY_HERE"}}' />
     </Form>
   );
 }
