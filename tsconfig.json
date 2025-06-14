@@ -1,21 +1,23 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "@raycast/eslint-config/tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2020",
-    "module": "commonjs",
     "lib": ["ES2020"],
+    "module": "commonjs",
+    "moduleResolution": "node",
     "jsx": "react-jsx",
-    "strict": true,
+    "strict": false,
     "esModuleInterop": true,
-    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "isolatedModules": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
     "noEmit": true,
-    "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true
+    "baseUrl": ".",
+    "paths": {
+      "react": ["./node_modules/@types/react"]
+    }
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules"]
+  "include": ["src/**/*", "raycast-env.d.ts"],
+  "exclude": ["node_modules", "dist"]
 }

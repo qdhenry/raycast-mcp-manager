@@ -1,5 +1,5 @@
 import { Form, ActionPanel, Action, showToast, Toast, popToRoot, LocalStorage } from "@raycast/api";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as fs from "fs/promises";
